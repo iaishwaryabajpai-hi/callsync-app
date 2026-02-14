@@ -272,9 +272,9 @@ export default function CallPage() {
 
     // Show video call interface
     return (
-        <div className="min-h-screen bg-black flex flex-col">
+        <div className="h-screen w-screen bg-black flex flex-col overflow-hidden">
             {/* Minimal futuristic header */}
-            <div className="bg-black border-b border-white/10 backdrop-blur-xl px-6 py-4">
+            <div className="bg-black border-b border-white/10 backdrop-blur-xl px-6 py-3 flex-shrink-0">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     {/* Logo and Timer */}
                     <div className="flex items-center space-x-8">
@@ -312,9 +312,9 @@ export default function CallPage() {
                 </div>
             </div>
 
-            {/* Jitsi Meet Container */}
-            <div className="flex-1 relative">
-                <div ref={jitsiContainerRef} className="absolute inset-0" />
+            {/* Jitsi Meet Container - Full height, single screen */}
+            <div className="flex-1 w-full overflow-hidden">
+                <div ref={jitsiContainerRef} className="w-full h-full" />
             </div>
         </div>
     );
