@@ -98,20 +98,79 @@ export default function CallPage() {
             height: '100%',
             parentNode: jitsiContainerRef.current,
             userInfo: {
-                displayName: userId
+                displayName: userId,
+                email: `${userId}@callsync.app`
             },
             configOverwrite: {
                 startWithAudioMuted: false,
                 startWithVideoMuted: false,
                 prejoinPageEnabled: false,
+                disableDeepLinking: true,
+
+                // Hide branding and make it professional
+                defaultLogoUrl: '',
+                defaultRemoteDisplayName: 'Participant',
+                defaultLocalDisplayName: 'You',
+
+                // Professional color customization
+                brandingRoomAlias: 'CallSync',
+
+                // Disable features that show Jitsi branding
+                disableInviteFunctions: true,
+                doNotStoreRoom: true,
+
+                // Quality settings
+                resolution: 720,
+                constraints: {
+                    video: {
+                        height: { ideal: 720, max: 1080, min: 240 }
+                    }
+                }
             },
             interfaceConfigOverwrite: {
-                TOOLBAR_BUTTONS: [
-                    'microphone', 'camera', 'desktop', 'fullscreen',
-                    'hangup', 'chat', 'raisehand', 'tileview'
-                ],
+                // Hide ALL Jitsi branding
                 SHOW_JITSI_WATERMARK: false,
                 SHOW_WATERMARK_FOR_GUESTS: false,
+                SHOW_BRAND_WATERMARK: false,
+                SHOW_POWERED_BY: false,
+
+                // Custom branding
+                APP_NAME: 'CallSync',
+                NATIVE_APP_NAME: 'CallSync',
+                PROVIDER_NAME: 'CallSync',
+
+                // Toolbar customization - minimal and professional
+                TOOLBAR_BUTTONS: [
+                    'microphone',
+                    'camera',
+                    'desktop',
+                    'fullscreen',
+                    'hangup',
+                    'chat'
+                ],
+
+                // Hide unnecessary UI elements
+                HIDE_INVITE_MORE_HEADER: true,
+                DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+                DISABLE_PRESENCE_STATUS: true,
+                DISABLE_RINGING: false,
+
+                // Professional styling
+                DISABLE_VIDEO_BACKGROUND: false,
+                FILM_STRIP_MAX_HEIGHT: 120,
+
+                // Mobile
+                MOBILE_APP_PROMO: false,
+
+                // Settings
+                SETTINGS_SECTIONS: ['devices', 'language'],
+
+                // Video quality
+                VIDEO_QUALITY_LABEL_DISABLED: false,
+
+                // Remove Jitsi logo from loading screen
+                DEFAULT_LOGO_URL: '',
+                DEFAULT_WELCOME_PAGE_LOGO_URL: ''
             }
         };
 
@@ -120,6 +179,21 @@ export default function CallPage() {
         // Listen for hang up
         jitsiApiRef.current.addEventListener('readyToClose', () => {
             handleEndCall();
+        });
+
+        // Custom CSS injection to further hide branding
+        jitsiApiRef.current.addEventListener('videoConferenceJoined', () => {
+            const iframe = jitsiContainerRef.current?.querySelector('iframe');
+            if (iframe && iframe.contentDocument) {
+                const style = iframe.contentDocument.createElement('style');
+                style.textContent = `
+                    .subject { display: none !important; }
+                    .watermark { display: none !important; }
+                    div[class*="poweredby"] { display: none !important; }
+                    div[class*="brand"] { display: none !important; }
+                `;
+                iframe.contentDocument.head.appendChild(style);
+            }
         });
     };
 
