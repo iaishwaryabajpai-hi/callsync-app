@@ -1,0 +1,16 @@
+services:
+  # Backend + TURN Server
+  - type: web
+    name: callsync-app
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cd server && npm install && cd ../client && npm install && npm run build
+    startCommand: cd server && node start-render.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
