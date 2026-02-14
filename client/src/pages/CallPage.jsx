@@ -30,6 +30,46 @@ export default function CallPage() {
         }
     }, [sessionId, role]);
 
+    // Fetch session data and sync timer
+    useEffect(() => {
+        if (!hasJoined || !sessionId) return;
+
+        const fetchSessionData = async () => {
+            try {
+                const response = await fetch(`/api/sessions/${sessionId}`);
+                const session = await response.json();
+
+                if (session.start_time) {
+                    // Start synchronized timer based on server's start_time
+                    const startTimer = () => {
+                        const startTime = new Date(session.start_time).getTime();
+                        const updateTimer = () => {
+                            const now = Date.now();
+                            const elapsed = Math.floor((now - startTime) / 1000);
+                            const remaining = Math.max(0, session.duration_limit * 60 - elapsed);
+                            setTimeRemaining(remaining);
+
+                            if (remaining === 0) {
+                                handleEndCall();
+                            }
+                        };
+
+                        updateTimer();
+                        const interval = setInterval(updateTimer, 1000);
+                        return interval;
+                    };
+
+                    const timerInterval = startTimer();
+                    return () => clearInterval(timerInterval);
+                }
+            } catch (error) {
+                console.error('Failed to fetch session data:', error);
+            }
+        };
+
+        fetchSessionData();
+    }, [hasJoined, sessionId]);
+
     // Initialize Jitsi Meet
     useEffect(() => {
         if (!hasJoined || !userId) return;
@@ -77,26 +117,10 @@ export default function CallPage() {
 
         jitsiApiRef.current = new window.JitsiMeetExternalAPI('meet.jit.si', options);
 
-        // Start timer when joined
-        const startTime = Date.now();
-        const timer = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            const remaining = Math.max(0, durationLimit * 60 - elapsed);
-            setTimeRemaining(remaining);
-
-            if (remaining === 0) {
-                clearInterval(timer);
-                handleEndCall();
-            }
-        }, 1000);
-
         // Listen for hang up
         jitsiApiRef.current.addEventListener('readyToClose', () => {
-            clearInterval(timer);
             handleEndCall();
         });
-
-        return () => clearInterval(timer);
     };
 
     const handleEndCall = () => {
