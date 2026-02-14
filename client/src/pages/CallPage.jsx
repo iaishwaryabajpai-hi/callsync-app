@@ -1,7 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import AgoraRTC from 'agora-rtc-sdk-ng';
 import TimerDisplay from '../components/TimerDisplay';
-import { Copy, Check, Users } from 'lucide-react';
+import { Copy, Check, Users, Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
+
+const APP_ID = '2a22e85308a347fab89fae0ef6f52b3e'; // Your Agora App ID
 
 export default function CallPage() {
     const { sessionId } = useParams();
@@ -16,10 +19,16 @@ export default function CallPage() {
     const [timeRemaining, setTimeRemaining] = useState(null);
     const [durationLimit, setDurationLimit] = useState(30);
 
-    const jitsiContainerRef = useRef(null);
-    const jitsiApiRef = useRef(null);
+    const [isMuted, setIsMuted] = useState(false);
+    const [isVideoOff, setIsVideoOff] = useState(false);
+    const [isConnected, setIsConnected] = useState(false);
 
-    // Load stored session (caller auto-joins)
+    const clientRef = useRef(null);
+    const localVideoTrackRef = useRef(null);
+    const localAudioTrackRef = useRef(null);
+    const remoteUsersRef = useRef(new Map());
+
+    // Load stored session
     useEffect(() => {
         const stored = sessionStorage.getItem(`session_${sessionId}`);
         if (stored) {
@@ -37,10 +46,11 @@ export default function CallPage() {
         const fetchSessionData = async () => {
             try {
                 const response = await fetch(`/api/sessions/${sessionId}`);
+                if (!response.ok) throw new Error('Session not found');
+
                 const session = await response.json();
 
                 if (session.start_time) {
-                    // Start synchronized timer based on server's start_time
                     const startTimer = () => {
                         const startTime = new Date(session.start_time).getTime();
                         const updateTimer = () => {
@@ -64,69 +74,103 @@ export default function CallPage() {
                 }
             } catch (error) {
                 console.error('Failed to fetch session data:', error);
+                // Fallback to local timer
+                setTimeRemaining(durationLimit * 60);
             }
         };
 
         fetchSessionData();
-    }, [hasJoined, sessionId]);
+    }, [hasJoined, sessionId, durationLimit]);
 
-    // Initialize Jitsi Meet
+    // Initialize Agora
     useEffect(() => {
         if (!hasJoined || !userId) return;
 
-        // Load Jitsi Meet API
-        const script = document.createElement('script');
-        script.src = 'https://meet.jit.si/external_api.js';
-        script.async = true;
-        script.onload = () => initializeJitsi();
-        document.body.appendChild(script);
+        const initAgora = async () => {
+            try {
+                // Create Agora client
+                clientRef.current = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+
+                // Handle remote users
+                clientRef.current.on('user-published', async (user, mediaType) => {
+                    await clientRef.current.subscribe(user, mediaType);
+
+                    if (mediaType === 'video') {
+                        const remoteVideoTrack = user.videoTrack;
+                        const playerContainer = document.getElementById('remote-player');
+                        if (playerContainer) {
+                            remoteVideoTrack.play(playerContainer);
+                        }
+                    }
+                    if (mediaType === 'audio') {
+                        user.audioTrack.play();
+                    }
+
+                    remoteUsersRef.current.set(user.uid, user);
+                    setIsConnected(true);
+                });
+
+                clientRef.current.on('user-unpublished', (user) => {
+                    remoteUsersRef.current.delete(user.uid);
+                    if (remoteUsersRef.current.size === 0) {
+                        setIsConnected(false);
+                    }
+                });
+
+                // Join channel
+                await clientRef.current.join(APP_ID, sessionId, null, userId);
+
+                // Create and publish local tracks
+                localAudioTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack();
+                localVideoTrackRef.current = await AgoraRTC.createCameraVideoTrack();
+
+                await clientRef.current.publish([localAudioTrackRef.current, localVideoTrackRef.current]);
+
+                // Play local video
+                const localPlayerContainer = document.getElementById('local-player');
+                if (localPlayerContainer) {
+                    localVideoTrackRef.current.play(localPlayerContainer);
+                }
+
+            } catch (error) {
+                console.error('Agora initialization error:', error);
+            }
+        };
+
+        initAgora();
 
         return () => {
-            if (jitsiApiRef.current) {
-                jitsiApiRef.current.dispose();
+            if (localVideoTrackRef.current) {
+                localVideoTrackRef.current.close();
             }
-            document.body.removeChild(script);
+            if (localAudioTrackRef.current) {
+                localAudioTrackRef.current.close();
+            }
+            if (clientRef.current) {
+                clientRef.current.leave();
+            }
         };
     }, [hasJoined, userId, sessionId]);
 
-    const initializeJitsi = () => {
-        if (!window.JitsiMeetExternalAPI) return;
-
-        const options = {
-            roomName: `CallSync_${sessionId}`,
-            width: '100%',
-            height: '100%',
-            parentNode: jitsiContainerRef.current,
-            userInfo: {
-                displayName: userId
-            },
-            configOverwrite: {
-                startWithAudioMuted: false,
-                startWithVideoMuted: false,
-                prejoinPageEnabled: false,
-            },
-            interfaceConfigOverwrite: {
-                TOOLBAR_BUTTONS: [
-                    'microphone', 'camera', 'desktop', 'fullscreen',
-                    'hangup', 'chat', 'raisehand', 'tileview'
-                ],
-                SHOW_JITSI_WATERMARK: false,
-                SHOW_WATERMARK_FOR_GUESTS: false,
-            }
-        };
-
-        jitsiApiRef.current = new window.JitsiMeetExternalAPI('meet.jit.si', options);
-
-        // Listen for hang up
-        jitsiApiRef.current.addEventListener('readyToClose', () => {
-            handleEndCall();
-        });
+    const toggleMute = () => {
+        if (localAudioTrackRef.current) {
+            localAudioTrackRef.current.setEnabled(isMuted);
+            setIsMuted(!isMuted);
+        }
     };
 
-    const handleEndCall = () => {
-        if (jitsiApiRef.current) {
-            jitsiApiRef.current.dispose();
+    const toggleVideo = () => {
+        if (localVideoTrackRef.current) {
+            localVideoTrackRef.current.setEnabled(isVideoOff);
+            setIsVideoOff(!isVideoOff);
         }
+    };
+
+    const handleEndCall = async () => {
+        if (localVideoTrackRef.current) localVideoTrackRef.current.close();
+        if (localAudioTrackRef.current) localAudioTrackRef.current.close();
+        if (clientRef.current) await clientRef.current.leave();
+
         navigate(`/call-ended?reason=completed`);
     };
 
@@ -143,17 +187,13 @@ export default function CallPage() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // Show join form for callee
+    // Join screen
     if (!hasJoined) {
         return (
             <div className="min-h-screen bg-black text-white flex items-center justify-center p-4 relative overflow-hidden">
-                {/* Grid background */}
                 <div className="absolute inset-0 opacity-5">
                     <div className="absolute inset-0" style={{
-                        backgroundImage: `
-                            linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-                            linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
-                        `,
+                        backgroundImage: `linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)`,
                         backgroundSize: '50px 50px'
                     }} />
                 </div>
@@ -196,13 +236,12 @@ export default function CallPage() {
         );
     }
 
-    // Show video call interface
+    // Call interface
     return (
         <div className="min-h-screen bg-black flex flex-col">
-            {/* Minimal futuristic header */}
+            {/* Header */}
             <div className="bg-black border-b border-white/10 backdrop-blur-xl px-6 py-4">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    {/* Logo and Timer */}
                     <div className="flex items-center space-x-8">
                         <div className="flex items-center space-x-2">
                             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
@@ -219,28 +258,67 @@ export default function CallPage() {
                         )}
                     </div>
 
-                    {/* Invite Link Button */}
                     {role === 'caller' && (
                         <button
                             onClick={copyLink}
-                            className="flex items-center space-x-2 border border-white/20 bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg transition-all group"
+                            className="flex items-center space-x-2 border border-white/20 bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg transition-all"
                         >
-                            {copied ? (
-                                <Check className="w-4 h-4" strokeWidth={2} />
-                            ) : (
-                                <Copy className="w-4 h-4" strokeWidth={2} />
-                            )}
-                            <span className="text-sm font-mono tracking-wider">
-                                {copied ? 'COPIED' : 'INVITE'}
-                            </span>
+                            {copied ? <Check className="w-4 h-4" strokeWidth={2} /> : <Copy className="w-4 h-4" strokeWidth={2} />}
+                            <span className="text-sm font-mono tracking-wider">{copied ? 'COPIED' : 'INVITE'}</span>
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* Jitsi Meet Container */}
-            <div className="flex-1 relative">
-                <div ref={jitsiContainerRef} className="absolute inset-0" />
+            {/* Video Grid */}
+            <div className="flex-1 relative bg-black p-4">
+                <div className="h-full flex items-center justify-center gap-4">
+                    {/* Remote Video */}
+                    <div className="flex-1 h-full max-w-2xl bg-gray-900 rounded-xl overflow-hidden relative border border-white/10">
+                        <div id="remote-player" className="w-full h-full" />
+                        {!isConnected && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                                <p className="text-white/40 font-mono text-sm">Waiting for participant...</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Local Video (small) */}
+                    <div className="absolute bottom-20 right-8 w-64 h-48 bg-gray-900 rounded-xl overflow-hidden border-2 border-white/20">
+                        <div id="local-player" className="w-full h-full" />
+                        {isVideoOff && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black">
+                                <VideoOff className="w-12 h-12 text-white/40" />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Controls */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center space-x-4">
+                <button
+                    onClick={toggleMute}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-white/10 hover:bg-white/20'
+                        } border border-white/20`}
+                >
+                    {isMuted ? <MicOff className="w-5 h-5 text-white" /> : <Mic className="w-5 h-5 text-white" />}
+                </button>
+
+                <button
+                    onClick={toggleVideo}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${isVideoOff ? 'bg-red-500 hover:bg-red-600' : 'bg-white/10 hover:bg-white/20'
+                        } border border-white/20`}
+                >
+                    {isVideoOff ? <VideoOff className="w-5 h-5 text-white" /> : <Video className="w-5 h-5 text-white" />}
+                </button>
+
+                <button
+                    onClick={handleEndCall}
+                    className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all border border-red-400"
+                >
+                    <PhoneOff className="w-5 h-5 text-white" />
+                </button>
             </div>
         </div>
     );
