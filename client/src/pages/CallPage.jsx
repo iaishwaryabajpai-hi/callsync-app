@@ -146,37 +146,51 @@ export default function CallPage() {
     // Show join form for callee
     if (!hasJoined) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-                    <div className="flex items-center justify-center mb-6">
-                        <div className="bg-gradient-to-r from-purple-500 to-blue-500 p-3 rounded-full">
-                            <Users className="w-8 h-8 text-white" />
+            <div className="min-h-screen bg-black text-white flex items-center justify-center p-4 relative overflow-hidden">
+                {/* Grid background */}
+                <div className="absolute inset-0 opacity-5">
+                    <div className="absolute inset-0" style={{
+                        backgroundImage: `
+                            linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+                        `,
+                        backgroundSize: '50px 50px'
+                    }} />
+                </div>
+
+                <div className="relative z-10 w-full max-w-md">
+                    <div className="border border-white/10 bg-white/5 backdrop-blur-xl rounded-2xl p-8">
+                        <div className="flex items-center justify-center mb-6">
+                            <div className="w-16 h-16 border border-white/20 rounded-full flex items-center justify-center">
+                                <Users className="w-7 h-7 text-white" strokeWidth={1.5} />
+                            </div>
                         </div>
+
+                        <h1 className="text-2xl font-thin text-center mb-1 tracking-widest uppercase">
+                            Join <span className="font-bold">Session</span>
+                        </h1>
+                        <p className="text-white/40 text-center mb-8 text-sm font-mono tracking-wider">
+                            ENTER YOUR NAME TO CONTINUE
+                        </p>
+
+                        <input
+                            type="text"
+                            value={joinName}
+                            onChange={(e) => setJoinName(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && handleJoin()}
+                            placeholder="Your Display Name"
+                            className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:border-white/40 focus:outline-none transition-all mb-6 font-mono"
+                            autoFocus
+                        />
+
+                        <button
+                            onClick={handleJoin}
+                            disabled={!joinName.trim()}
+                            className="w-full bg-white text-black py-3 rounded-lg font-mono font-bold tracking-widest uppercase text-sm hover:bg-white/90 disabled:bg-white/10 disabled:text-white/20 disabled:cursor-not-allowed transition-all"
+                        >
+                            Join Call
+                        </button>
                     </div>
-                    <h1 className="text-2xl font-bold text-center mb-2 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                        Join Video Call
-                    </h1>
-                    <p className="text-gray-600 text-center mb-6">
-                        Enter your name to join the session
-                    </p>
-
-                    <input
-                        type="text"
-                        value={joinName}
-                        onChange={(e) => setJoinName(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleJoin()}
-                        placeholder="Your Name"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none mb-4"
-                        autoFocus
-                    />
-
-                    <button
-                        onClick={handleJoin}
-                        disabled={!joinName.trim()}
-                        className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-3 px-6 rounded-lg font-semibold hover:from-purple-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                        Join Call
-                    </button>
                 </div>
             </div>
         );
@@ -184,12 +198,19 @@ export default function CallPage() {
 
     // Show video call interface
     return (
-        <div className="min-h-screen bg-gray-900 flex flex-col">
-            {/* Header with timer and invite link */}
-            <div className="bg-gray-800 border-b border-gray-700 p-4">
+        <div className="min-h-screen bg-black flex flex-col">
+            {/* Minimal futuristic header */}
+            <div className="bg-black border-b border-white/10 backdrop-blur-xl px-6 py-4">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                        <h1 className="text-white font-semibold text-lg">CallSync</h1>
+                    {/* Logo and Timer */}
+                    <div className="flex items-center space-x-8">
+                        <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                            <h1 className="text-white font-thin tracking-widest text-lg uppercase">
+                                Call<span className="font-bold">Sync</span>
+                            </h1>
+                        </div>
+
                         {timeRemaining !== null && (
                             <TimerDisplay
                                 timeRemaining={timeRemaining}
@@ -198,13 +219,20 @@ export default function CallPage() {
                         )}
                     </div>
 
+                    {/* Invite Link Button */}
                     {role === 'caller' && (
                         <button
                             onClick={copyLink}
-                            className="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                            className="flex items-center space-x-2 border border-white/20 bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg transition-all group"
                         >
-                            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                            <span className="text-sm">{copied ? 'Copied!' : 'Copy Invite Link'}</span>
+                            {copied ? (
+                                <Check className="w-4 h-4" strokeWidth={2} />
+                            ) : (
+                                <Copy className="w-4 h-4" strokeWidth={2} />
+                            )}
+                            <span className="text-sm font-mono tracking-wider">
+                                {copied ? 'COPIED' : 'INVITE'}
+                            </span>
                         </button>
                     )}
                 </div>

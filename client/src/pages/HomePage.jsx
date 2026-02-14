@@ -1,280 +1,138 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createSession } from '../services/api';
-import {
-    Phone,
-    Clock,
-    Shield,
-    Zap,
-    Video,
-    Users,
-    ArrowRight,
-    Loader2,
-} from 'lucide-react';
+import { Phone, Clock, Zap } from 'lucide-react';
 
 export default function HomePage() {
-    const navigate = useNavigate();
-    const [callerId, setCallerId] = useState('');
+    const [yourId, setYourId] = useState('');
     const [calleeId, setCalleeId] = useState('');
     const [duration, setDuration] = useState(30);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
+    const navigate = useNavigate();
 
-    const handleStartCall = async (e) => {
-        e.preventDefault();
-        if (!callerId.trim() || !calleeId.trim()) {
-            setError('Please enter both User IDs');
-            return;
-        }
-        setError('');
-        setLoading(true);
+    const handleStartCall = async () => {
+        if (!yourId.trim() || !calleeId.trim()) return;
 
-        try {
-            const session = await createSession({
-                callerId: callerId.trim(),
+        const response = await fetch('/api/sessions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                callerId: yourId.trim(),
                 calleeId: calleeId.trim(),
                 durationLimit: duration,
-            });
+            }),
+        });
 
-            // Store session data for the call page
-            sessionStorage.setItem(
-                `session_${session.sessionId}`,
-                JSON.stringify({ ...session, callerId: callerId.trim() })
-            );
-
-            navigate(`/call/${session.sessionId}?role=caller`);
-        } catch (err) {
-            setError('Failed to create session. Is the server running?');
-        } finally {
-            setLoading(false);
-        }
+        const session = await response.json();
+        sessionStorage.setItem(`session_${session.sessionId}`, JSON.stringify(session));
+        navigate(`/call/${session.sessionId}?role=caller`);
     };
 
-    const features = [
-        {
-            icon: <Shield size={22} />,
-            title: 'Server Authority',
-            desc: 'Backend controls all timing – tamper-proof enforcement.',
-        },
-        {
-            icon: <Clock size={22} />,
-            title: 'Live Countdown',
-            desc: 'Real-time timer synced via WebSocket every second.',
-        },
-        {
-            icon: <Zap size={22} />,
-            title: 'Auto Disconnect',
-            desc: 'Calls forcibly end at 0:00 – no extensions possible.',
-        },
-        {
-            icon: <Video size={22} />,
-            title: 'Agora HD Calls',
-            desc: 'Crystal-clear video & audio powered by Agora SDK.',
-        },
-    ];
-
     return (
-        <div className="min-h-screen relative overflow-hidden">
-            {/* Ambient background */}
-            <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-primary-600/10 rounded-full blur-[120px]" />
-                <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-accent-500/8 rounded-full blur-[100px]" />
+        <div className="min-h-screen bg-black text-white flex items-center justify-center p-4 relative overflow-hidden">
+            {/* Futuristic grid background */}
+            <div className="absolute inset-0 opacity-5">
+                <div className="absolute inset-0" style={{
+                    backgroundImage: `
+                        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+                    `,
+                    backgroundSize: '50px 50px'
+                }} />
             </div>
 
-            <div className="relative z-10 max-w-6xl mx-auto px-6 py-12">
+            {/* Glowing orb effect */}
+            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
+
+            {/* Main content */}
+            <div className="relative z-10 w-full max-w-md">
                 {/* Header */}
-                <header className="text-center mb-16 animate-slide-up">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary-600/10 border border-primary-600/20 mb-6">
-                        <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-xs font-medium text-primary-300">System Online</span>
+                <div className="text-center mb-12">
+                    <div className="inline-flex items-center justify-center w-20 h-20 mb-6 border border-white/20 rounded-full relative">
+                        <Phone className="w-8 h-8 text-white" strokeWidth={1.5} />
+                        <div className="absolute inset-0 rounded-full border border-white/10 animate-ping"
+                            style={{ animationDuration: '3s' }} />
                     </div>
-
-                    <h1 className="text-5xl md:text-6xl font-bold mb-4 leading-tight">
-                        <span className="gradient-text">CallSync</span>
+                    <h1 className="text-4xl font-thin tracking-widest mb-2 uppercase">
+                        Call<span className="font-bold">Sync</span>
                     </h1>
-                    <p className="text-lg text-white/50 max-w-xl mx-auto leading-relaxed">
-                        Secure, time-limited audio &amp; video calls with server-enforced session boundaries.
+                    <p className="text-white/40 text-sm tracking-wider font-mono">
+                        TIMED VIDEO SESSIONS
                     </p>
-                </header>
+                </div>
 
-                <div className="grid lg:grid-cols-2 gap-12 items-start">
-                    {/* ── Left: Call Form ──────────────────────────── */}
-                    <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
-                        <div className="glass rounded-3xl p-8">
-                            <div className="flex items-center gap-3 mb-8">
-                                <div className="w-10 h-10 rounded-xl bg-primary-600/20 flex items-center justify-center">
-                                    <Phone size={20} className="text-primary-400" />
-                                </div>
-                                <div>
-                                    <h2 className="text-lg font-semibold text-white">Start a Call</h2>
-                                    <p className="text-xs text-white/40">Create a new timed session</p>
-                                </div>
-                            </div>
+                {/* Form Card */}
+                <div className="border border-white/10 bg-white/5 backdrop-blur-xl rounded-2xl p-8">
+                    {/* Input Fields */}
+                    <div className="space-y-6 mb-8">
+                        <div>
+                            <label className="block text-xs text-white/40 mb-2 uppercase tracking-widest font-mono">
+                                Your User ID
+                            </label>
+                            <input
+                                type="text"
+                                value={yourId}
+                                onChange={(e) => setYourId(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleStartCall()}
+                                placeholder="Enter your ID"
+                                className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:border-white/40 focus:outline-none transition-all font-mono"
+                                autoFocus
+                            />
+                        </div>
 
-                            <form onSubmit={handleStartCall} className="space-y-5">
-                                {/* Caller ID */}
-                                <div>
-                                    <label className="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">
-                                        Your User ID
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={callerId}
-                                        onChange={(e) => setCallerId(e.target.value)}
-                                        placeholder="e.g. user_alice"
-                                        className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/20 transition-all text-sm"
-                                    />
-                                </div>
+                        <div>
+                            <label className="block text-xs text-white/40 mb-2 uppercase tracking-widest font-mono">
+                                Call User ID
+                            </label>
+                            <input
+                                type="text"
+                                value={calleeId}
+                                onChange={(e) => setCalleeId(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleStartCall()}
+                                placeholder="Enter recipient ID"
+                                className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/20 focus:border-white/40 focus:outline-none transition-all font-mono"
+                            />
+                        </div>
 
-                                {/* Callee ID */}
-                                <div>
-                                    <label className="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">
-                                        Call User ID
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={calleeId}
-                                        onChange={(e) => setCalleeId(e.target.value)}
-                                        placeholder="e.g. user_bob"
-                                        className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/20 transition-all text-sm"
-                                    />
-                                </div>
-
-                                {/* Duration */}
-                                <div>
-                                    <label className="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">
-                                        Session Duration
-                                    </label>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="range"
-                                            min="1"
-                                            max="120"
-                                            value={duration}
-                                            onChange={(e) => setDuration(Number(e.target.value))}
-                                            className="flex-1 accent-primary-500"
-                                        />
-                                        <div className="px-3 py-2 rounded-lg bg-primary-600/15 border border-primary-600/20 min-w-[80px] text-center">
-                                            <span className="text-sm font-mono font-semibold text-primary-300">{duration} min</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between mt-1 text-[10px] text-white/20">
-                                        <span>1 min</span>
-                                        <span>120 min</span>
-                                    </div>
-                                </div>
-
-                                {/* Error */}
-                                {error && (
-                                    <div className="px-4 py-3 rounded-xl bg-danger-500/10 border border-danger-500/20 text-danger-400 text-sm animate-fade-in">
-                                        {error}
-                                    </div>
-                                )}
-
-                                {/* Submit */}
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-primary-600 to-accent-600 text-white font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 hover:shadow-lg hover:shadow-primary-600/20 transition-all duration-300 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                                >
-                                    {loading ? (
-                                        <>
-                                            <Loader2 size={18} className="animate-spin" />
-                                            Creating Session...
-                                        </>
-                                    ) : (
-                                        <>
-                                            Start Call
-                                            <ArrowRight size={18} />
-                                        </>
-                                    )}
-                                </button>
-                            </form>
-
-                            {/* Quick join */}
-                            <div className="mt-6 pt-6 border-t border-white/5">
-                                <p className="text-xs text-white/30 text-center mb-3">
-                                    Have a session link? Enter the Session ID to join.
-                                </p>
-                                <div className="flex gap-2">
-                                    <input
-                                        id="join-session-input"
-                                        type="text"
-                                        placeholder="Session ID"
-                                        className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-primary-500/50 transition-all text-sm"
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            const sid = document.getElementById('join-session-input').value.trim();
-                                            if (sid) navigate(`/call/${sid}?role=callee`);
-                                        }}
-                                        className="px-5 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:text-white hover:bg-white/10 transition-all text-sm font-medium cursor-pointer"
-                                    >
-                                        Join
-                                    </button>
-                                </div>
+                        <div>
+                            <label className="block text-xs text-white/40 mb-2 uppercase tracking-widest font-mono flex items-center">
+                                <Clock className="w-3 h-3 mr-2" />
+                                Duration: {duration} min
+                            </label>
+                            <input
+                                type="range"
+                                min="5"
+                                max="60"
+                                step="5"
+                                value={duration}
+                                onChange={(e) => setDuration(Number(e.target.value))}
+                                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
+                                style={{
+                                    background: `linear-gradient(to right, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.6) ${(duration - 5) / 55 * 100}%, rgba(255,255,255,0.1) ${(duration - 5) / 55 * 100}%, rgba(255,255,255,0.1) 100%)`
+                                }}
+                            />
+                            <div className="flex justify-between text-xs text-white/20 mt-1 font-mono">
+                                <span>5m</span>
+                                <span>60m</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* ── Right: Features ─────────────────────────── */}
-                    <div className="space-y-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
-                        {/* Feature cards */}
-                        <div className="grid grid-cols-2 gap-4">
-                            {features.map((f, i) => (
-                                <div
-                                    key={i}
-                                    className="glass-light rounded-2xl p-5 hover:border-primary-600/20 transition-all duration-300 group"
-                                >
-                                    <div className="w-10 h-10 rounded-xl bg-primary-600/10 flex items-center justify-center mb-3 text-primary-400 group-hover:bg-primary-600/20 transition-colors">
-                                        {f.icon}
-                                    </div>
-                                    <h3 className="text-sm font-semibold text-white/90 mb-1">
-                                        {f.title}
-                                    </h3>
-                                    <p className="text-xs text-white/40 leading-relaxed">
-                                        {f.desc}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
+                    {/* Start Button */}
+                    <button
+                        onClick={handleStartCall}
+                        disabled={!yourId.trim() || !calleeId.trim()}
+                        className="w-full bg-white text-black py-4 rounded-lg font-mono font-bold tracking-widest uppercase text-sm hover:bg-white/90 disabled:bg-white/10 disabled:text-white/20 disabled:cursor-not-allowed transition-all relative overflow-hidden group"
+                    >
+                        <span className="relative z-10 flex items-center justify-center">
+                            <Zap className="w-4 h-4 mr-2" strokeWidth={2.5} />
+                            Start Call
+                        </span>
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
+                    </button>
+                </div>
 
-                        {/* How it works */}
-                        <div className="glass-light rounded-2xl p-6">
-                            <h3 className="text-sm font-semibold text-white/80 mb-4 flex items-center gap-2">
-                                <Users size={16} className="text-primary-400" />
-                                How It Works
-                            </h3>
-                            <div className="space-y-4">
-                                {[
-                                    { step: '01', text: 'User A creates a timed call session' },
-                                    { step: '02', text: 'User B joins via session ID link' },
-                                    { step: '03', text: 'Server starts authoritative countdown' },
-                                    { step: '04', text: 'Warning at 2 min, force-end at 0:00' },
-                                ].map((s, i) => (
-                                    <div key={i} className="flex items-center gap-3">
-                                        <span className="text-xs font-mono font-bold text-primary-500/60 w-6">
-                                            {s.step}
-                                        </span>
-                                        <div className="h-px flex-1 bg-white/5" />
-                                        <span className="text-xs text-white/50">{s.text}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Tech badges */}
-                        <div className="flex flex-wrap gap-2">
-                            {['React', 'Tailwind', 'Node.js', 'Socket.io', 'Agora SDK', 'Supabase'].map((t) => (
-                                <span
-                                    key={t}
-                                    className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-[10px] font-medium text-white/40 uppercase tracking-wider"
-                                >
-                                    {t}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
+                {/* Footer */}
+                <div className="mt-8 text-center text-xs text-white/20 font-mono">
+                    <p>Powered by Jitsi Meet • End-to-end Encrypted</p>
                 </div>
             </div>
         </div>
